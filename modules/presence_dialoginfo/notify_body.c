@@ -308,7 +308,7 @@ str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n)
 						state = xmlNodeGetNodeContentByName(node, "state", NULL);
 						if(state) {
 							LM_DBG("state element content = %s\n", state);
-							if (strcasecmp(state,"terminated") == 0)
+							if (strcasecmp(state,"terminated") == 0 && node_id == i)
 							{
 								LM_DBG("found terminated state\n" );
 								terminated_node = node;
