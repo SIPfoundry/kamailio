@@ -27,7 +27,7 @@ mod_list_db=acc alias_db auth_db avpops cfg_db db_text db_flatstore \
 			  db_cluster dialog dispatcher domain drouting group \
 			  htable imc matrix mohqueue msilo mtree p_usrloc pdt permissions \
 			  pipelimit prefix_route registrar sipcapture siptrace speeddial \
-			  sqlops uac uri_db userblacklist usrloc
+			  sqlops uac uri_db userblacklist usrloc 
 
 
 # - common modules depending on database, using UID db schema
@@ -183,6 +183,9 @@ mod_list_cnxcc=cnxcc
 # - modules depending on erlang library
 mod_list_erlang=erlang
 
+# - modules depending on sipx bla
+mod_list_sipx=sipx_bla
+
 # - all modules
 mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
 			   $(mod_list_db) $(mod_list_dbuid) \
@@ -209,9 +212,7 @@ mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
 			   $(mod_list_ev) $(mod_list_kazoo) \
 			   $(mod_list_mongodb) $(mod_list_cnxcc) \
 			   $(mod_list_jansson) $(mod_list_geoip2) \
-			   $(mod_list_erlang))
-
-
+			   $(mod_list_erlang) $(mod_list_sipx))
 
 ### --- Groups defined for source code compilation ###
 
@@ -393,6 +394,9 @@ module_group_kcnxcc=$(mod_list_cnxcc)
 
 # pkg erlang module
 module_group_kerlang=$(mod_list_erlang)
+
+# pkg erlang module
+module_group_sipx=$(mod_list_sipx)
 
 # list of static modules
 #
