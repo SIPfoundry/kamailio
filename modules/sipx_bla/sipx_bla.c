@@ -107,20 +107,6 @@ static int mod_init(void)
   bind_pua_t bind_pua;
   bind_presence_t bind_presence;
 
-  /* Check if server address is defined */
-  if(!server_address.s || server_address.len<=0) 
-  {
-    LM_ERR("server_address parameter not set\n");
-    return -1;
-  }
-
-  /* Check kamailio server address */
-  if(!db_sipx_im_url.s || db_sipx_im_url.len<=0) 
-  {
-    LM_ERR("db_sipx_im_url parameter not set\n");
-    return -1;
-  }
-
   /* Check bla header name */
   if(!bla_header_name.s || bla_header_name.len<=0) 
   {
@@ -149,24 +135,6 @@ static int mod_init(void)
     return -1;
   }
 
-  bind_presence= (bind_presence_t)find_export("bind_presence", 1,0);
-  if (!bind_presence) 
-  {
-      LM_ERR("can't bind presence\n");
-      return -1;
-  }
-  if (bind_presence(&pres) < 0) 
-  {
-      LM_ERR("can't bind pua\n");
-      return -1;
-  }
-
-  if(pres.add_event == NULL) 
-  {
-    LM_ERR("Could not import add_event\n");
-    return -1;
-  }
-
   /* Bind to SL API: */
   if (sl_load_api(&slb)!=0) 
   {
@@ -174,24 +142,56 @@ static int mod_init(void)
     return -1;
   }
 
-  /* Check IMDB connection */
-  if (im_db_bind(&db_sipx_im_url)) {
-    LM_ERR("no database module found. Have you configure the \"db_sipx_im_url\" modparam properly?\n");
-    return -1;
-  }
-
-  if (im_db_init(&db_sipx_im_url) < 0) {
-    LM_ERR("unable to open database connection\n");
-    return -1;
-  }
-
-  if(dlginfo_add_events() < 0) {
-    LM_ERR("unable to register dialog;sla events\n");
-    return -1;
-  }
-
   if(poll_sipx_bla_user == 1)
   {
+    /* Check if server address is defined */
+    if(!server_address.s || server_address.len<=0) 
+    {
+      LM_ERR("server_address parameter not set\n");
+      return -1;
+    }
+
+    /* Check kamailio database address */
+    if(!db_sipx_im_url.s || db_sipx_im_url.len<=0) 
+    {
+      LM_ERR("db_sipx_im_url parameter not set\n");
+      return -1;
+    }
+
+    bind_presence= (bind_presence_t)find_export("bind_presence", 1,0);
+    if (!bind_presence) 
+    {
+        LM_ERR("can't bind presence\n");
+        return -1;
+    }
+    if (bind_presence(&pres) < 0) 
+    {
+        LM_ERR("can't bind pua\n");
+        return -1;
+    }
+
+    if(pres.add_event == NULL) 
+    {
+      LM_ERR("Could not import add_event\n");
+      return -1;
+    }
+
+    /* Check IMDB connection */
+    if (im_db_bind(&db_sipx_im_url)) {
+      LM_ERR("no database module found. Have you configure the \"db_sipx_im_url\" modparam properly?\n");
+      return -1;
+    }
+
+    if (im_db_init(&db_sipx_im_url) < 0) {
+      LM_ERR("unable to open database connection\n");
+      return -1;
+    }
+
+    if(dlginfo_add_events() < 0) {
+      LM_ERR("unable to register dialog;sla events\n");
+      return -1;
+    }
+
     register_timer(subscribe_sipx_bla_users_timer, 0, poll_sipx_interval);
   }
 
@@ -207,27 +207,33 @@ static int child_init(int rank)
     return 0; /* do nothing for the main process */
   }
 
-  /*Set db connection per each child*/
-  if (im_db_init2(&db_sipx_im_url) < 0) 
+  if(poll_sipx_bla_user == 1)
   {
-    LM_ERR("unable to open database connection\n");
-    return -1;
-  }
+    /*Set db connection per each child*/
+    if (im_db_init2(&db_sipx_im_url) < 0) 
+    {
+      LM_ERR("unable to open database connection\n");
+      return -1;
+    }
 
-  if (im_dbf.use_table(im_db, &db_table_entity) < 0)
-  {
-    LM_ERR("child %d: Error in use_table pua\n", rank);
-    return -1;
-  }
+    if (im_dbf.use_table(im_db, &db_table_entity) < 0)
+    {
+      LM_ERR("child %d: Error in use_table pua\n", rank);
+      return -1;
+    }
 
-  LM_DBG("child %d: Database connection opened successfully\n", rank);
+    LM_DBG("child %d: Database connection opened successfully\n", rank);
+  }
 
   return 0;
 }
 
 static void destroy(void)
 {
-  im_db_close();
+  if(poll_sipx_bla_user == 1)
+  {
+    im_db_close();
+  }
 }
 
 static void subscribe_sipx_bla_users_timer(unsigned int ticks,void *param)

@@ -396,7 +396,7 @@ module_group_kcnxcc=$(mod_list_cnxcc)
 module_group_kerlang=$(mod_list_erlang)
 
 # pkg erlang module
-module_group_sipx=$(mod_list_sipx)
+module_group_ksipx=$(mod_list_sipx)
 
 # list of static modules
 #

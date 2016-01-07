@@ -103,7 +103,7 @@ int sipx_subscribe_bla_users()
 			LM_INFO("User %.*s is already subscribe to reg event\n", tmp_str->len, tmp_str->s);
 			list_free(&reg_subs_list);
 		} else 
-    {
+    	{
 			LM_INFO("Register reg event for %.*s\n", tmp_str->len, tmp_str->s);
 			subs_result = sipx_reginfo_subscribe(*tmp_str);
 			if(subs_result < 0) 

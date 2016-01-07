@@ -104,6 +104,9 @@ void process_contact(str aor, str callid, int cseq, int expires, int event, str 
   subs.contact= &server_address;
   subs.expires = 180;
 
+  if(outbound_proxy.s && outbound_proxy.len)
+    subs.outbound_proxy= &outbound_proxy;
+
   LM_INFO("Sending sipx bla subsribe to %.*s@%.*s"
     , parsed_contact_uri.user.len, parsed_contact_uri.user.s
     , parsed_contact_uri.host.len, parsed_contact_uri.host.s);
@@ -396,6 +399,13 @@ error:
 int sipx_handle_reginfo_notify_cmd(struct sip_msg* msg, char* s1, char* s2) {
   str body;
   int result = 1;
+
+  /* Check if we enable user poll*/
+  if(poll_sipx_bla_user != 1)
+  {
+    LM_ERR("SIPX BLA poll is disabled\n");
+    return -1;
+  }
 
   /* If not done yet, parse the whole message now: */
   if (parse_headers(msg, HDR_EOH_F, 0) == -1) 
