@@ -62,6 +62,7 @@ void process_contact(str aor, str callid, int cseq, int expires, int event, str 
     && event != EVENT_REFRESHED)
   {
     /* Contact is expired, deleted, unregistered, whatever: We do not need to do anything. */
+    LM_DBG("Contact is expired, deleted or unregistered (%.*s)\n", contact_uri.len, contact_uri.s);
     return;
   }
 
@@ -78,23 +79,25 @@ void process_contact(str aor, str callid, int cseq, int expires, int event, str 
     return;
   }
 
+  /*LM_DBG("Check BLA via AOR: %.*s -> %.*s\n"
+    , aor.len, aor.s
+    , contact_uri.len, contact_uri.s);
   if(is_user_supports_bla(&aor) < 0) 
   {
-    /* Contact is not a bla user: We do not need to do anything. */
-    LM_DBG("User is not a bla user: %.*s", aor.len, aor.s);
+    LM_DBG("User is not a bla user: %.*s\n", aor.len, aor.s);
     return;
-  }
+  }*/
 
   /*
      Send Subscribe
   */
   memset(&subs, 0, sizeof(subs_info_t));
-  id_buf_len = snprintf(id_buf, sizeof(id_buf), "SIPX_BLA_SUBSCRIBE.%.*s@%.*s"
-    , parsed_contact_uri.user.len, parsed_contact_uri.user.s
-    , parsed_contact_uri.host.len, parsed_contact_uri.host.s);
+  id_buf_len = snprintf(id_buf, sizeof(id_buf), "SIPX_BLA_SUBSCRIBE.%.*s", contact_uri.len, contact_uri.s);
 
   subs.id.s = id_buf;
   subs.id.len = id_buf_len;
+
+  LM_DBG("SIPX BLA Subscribe Id: %.*s\n", id_buf_len, id_buf);
   
   subs.remote_target= &contact_uri;
   subs.pres_uri= &aor;
@@ -107,9 +110,7 @@ void process_contact(str aor, str callid, int cseq, int expires, int event, str 
   if(outbound_proxy.s && outbound_proxy.len)
     subs.outbound_proxy= &outbound_proxy;
 
-  LM_INFO("Sending sipx bla subsribe to %.*s@%.*s"
-    , parsed_contact_uri.user.len, parsed_contact_uri.user.s
-    , parsed_contact_uri.host.len, parsed_contact_uri.host.s);
+  LM_INFO("Sending sipx bla subsribe to %.*s\n", contact_uri.len, contact_uri.s);
   if(pua.send_subscribe(&subs)< 0)
   {
     LM_ERR("while sending subscribe\n");
