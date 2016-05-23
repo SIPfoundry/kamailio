@@ -65,11 +65,11 @@ int redis_get_or_create_credit_data(credit_data_t *credit_data) {
 		goto error;
 
 	if (!exists) {  // doesn't exist
-		LM_INFO("credit_data with ID=[%s] DOES NOT exist in the cluster, creating it...\n", credit_data->str_id);
+		LM_DBG("credit_data with ID=[%s] DOES NOT exist in the cluster, creating it...\n", credit_data->str_id);
 		return redis_insert_credit_data(credit_data);
 	}
 
-	LM_INFO("credit_data with ID=[%s] DOES exist in the cluster, retrieving it...\n", credit_data->str_id);
+	LM_DBG("credit_data with ID=[%s] DOES exist in the cluster, retrieving it...\n", credit_data->str_id);
 
 	if (redis_get_double(credit_data, "HGET", "consumed_amount", &credit_data->consumed_amount) < 0)
 		goto error;
@@ -332,7 +332,7 @@ int redis_get_str(credit_data_t *credit_data, const char *instruction, const cha
 	}
 
 	if (rpl->type == REDIS_REPLY_NIL) {
-		LM_INFO("Value of %s is (nil)\n", key);
+		LM_DBG("Value of %s is (nil)\n", key);
 		goto done;
 	}
 
@@ -348,7 +348,7 @@ int redis_get_str(credit_data_t *credit_data, const char *instruction, const cha
 done:
 	freeReplyObject(rpl);
 
-	LM_INFO("Got STRING value: %s=[%.*s]\n", key, value->len, value->s);
+	LM_DBG("Got STRING value: %s=[%.*s]\n", key, value->len, value->s);
 	return 1;
 }
 
@@ -531,7 +531,7 @@ static void __subscription_cb(redisAsyncContext *c, void *r, void *privdata) {
 	 if (try_get_credit_data_entry(&key, &credit_data) < 0)
 		 return;
 
-	 lock_get(&credit_data->lock);
+	 cnxcc_lock(credit_data->lock);
 
 	 if (credit_data->deallocating)
 		 goto done; // no need to terminate the calls. They are already being terminated
@@ -539,6 +539,6 @@ static void __subscription_cb(redisAsyncContext *c, void *r, void *privdata) {
 	 LM_ALERT("Got kill list entry for key [%.*s]\n", key.len, key.s);
 	 terminate_all_calls(credit_data);
 done:
-	 lock_release(&credit_data->lock);
+	 cnxcc_unlock(credit_data->lock);
 
 }

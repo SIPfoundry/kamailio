@@ -51,10 +51,13 @@ static int add_contact(str aor, ucontact_info_t* ci)
 	str contact;
 	int res;
 
-        if (dmq_ul.get_udomain("location", &_d) < 0) {
-                LM_ERR("Failed to get domain\n");
-                return -1;
-        }
+	if (dmq_ul.get_udomain("location", &_d) < 0) {
+		LM_ERR("Failed to get domain\n");
+		return -1;
+	}
+
+	dmq_ul.lock_udomain(_d, &aor);
+
 	res = dmq_ul.get_urecord(_d, &aor, &r);
 	if (res < 0) {
 		LM_ERR("failed to retrieve record from usrloc\n");
@@ -197,14 +200,14 @@ void usrloc_get_all_ucontact(dmq_node_t* node)
         memcpy( &aorhash, cp, sizeof(aorhash));
         cp = (char*)cp + sizeof(aorhash);
 
+		r = 0;
+		ptr = 0;
         res = dmq_ul.get_urecord_by_ruid(_d, aorhash, &ruid, &r, &ptr);
-        aor = r->aor;
-        if (res > 0) {
-            LM_DBG("'%.*s' Not found in usrloc\n", aor.len, ZSW(aor.s));
-            dmq_ul.release_urecord(r);
-            dmq_ul.unlock_udomain(_d, &aor);
+        if (res < 0) {
+            LM_DBG("'%.*s' Not found in usrloc\n", ruid.len, ZSW(ruid.s));
             continue;
         }
+        aor = r->aor;
         LM_DBG("- AoR: %.*s  AoRhash=%d  Flags=%d\n", aor.len, aor.s, aorhash, flags);
 
         while (ptr) {
