@@ -148,7 +148,7 @@ static int __get_dialog_to_tag(str * to_tag, const str * from_tag, const struct 
 		goto error;
 	}
 
-	msg = _params->rpl ? _params->rpl : _params->req;
+	msg = _params->rpl && _params->rpl != FAKED_REPLY ? _params->rpl : _params->req;
 	if ( !msg || (!msg->to && ((parse_headers(msg, HDR_TO_F,0)<0) || !msg->to)) ) {
 		LM_ERR("bad reply or missing TO hdr :-/\n");
 		goto error;
