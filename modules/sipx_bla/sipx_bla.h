@@ -34,8 +34,18 @@ extern str db_table_entity;
 extern str server_address;
 extern str outbound_proxy;
 extern str bla_header_name;
+extern str message_queue_plugin_path;
 extern int poll_sipx_bla_user;
 extern int poll_sipx_interval;
+
+extern int use_bla_message_queue;
+extern str bla_message_queue_log_file;
+extern str bla_message_queue_channel;
+extern str bla_message_queue_redis_address;
+extern str bla_message_queue_redis_password;
+extern int bla_message_queue_redis_port;
+extern int bla_message_queue_redis_db;
+
 
 extern pua_api_t pua; /*!< Structure containing pointers to PUA functions*/
 extern presence_api_t pres; /*!< Structure containing pointers to PRESENCE functions*/
