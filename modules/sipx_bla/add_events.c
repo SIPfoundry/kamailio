@@ -51,9 +51,9 @@ int dlginfo_add_events(void)
   event.content_type.s= "application/dialog-info+xml";
   event.content_type.len= 27;
 
+  event.etag_not_new = 1;
   event.default_expires= 3600;
   event.type = PUBL_TYPE;
-  event.req_auth = 0;
   event.evs_publ_handl = xml_publ_handl;
 
   /* modify XML body for each watcher to set the correct "version" */

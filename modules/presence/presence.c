@@ -148,6 +148,7 @@ int max_expires= 3600;
 int shtable_size= 9;
 shtable_t subs_htable= NULL;
 int subs_dbmode = WRITE_BACK;
+int subs_use_highest_version = 0;
 int sphere_enable= 0;
 int timeout_rm_subs = 1;
 int send_fast_notify = 1;
@@ -190,35 +191,36 @@ static cmd_export_t cmds[]=
 };
 
 static param_export_t params[]={
-	{ "db_url",                 PARAM_STR, &db_url},
-	{ "presentity_table",       PARAM_STR, &presentity_table},
-	{ "active_watchers_table",  PARAM_STR, &active_watchers_table},
-	{ "watchers_table",         PARAM_STR, &watchers_table},
-	{ "clean_period",           INT_PARAM, &clean_period },
-	{ "db_update_period",       INT_PARAM, &db_update_period },
-	{ "waitn_time",             INT_PARAM, &pres_waitn_time },
-	{ "notifier_poll_rate",     INT_PARAM, &pres_notifier_poll_rate },
-	{ "notifier_processes",     INT_PARAM, &pres_notifier_processes },
-	{ "to_tag_pref",            PARAM_STRING, &to_tag_pref },
-	{ "expires_offset",         INT_PARAM, &expires_offset },
-	{ "max_expires",            INT_PARAM, &max_expires },
-	{ "min_expires",            INT_PARAM, &min_expires },
-    { "min_expires_action",     INT_PARAM, &min_expires_action },
-	{ "server_address",         PARAM_STR, &server_address},
-	{ "subs_htable_size",       INT_PARAM, &shtable_size},
-	{ "pres_htable_size",       INT_PARAM, &phtable_size},
-	{ "subs_db_mode",           INT_PARAM, &subs_dbmode},
-	{ "publ_cache",             INT_PARAM, &publ_cache_enabled},
-	{ "enable_sphere_check",    INT_PARAM, &sphere_enable},
-	{ "timeout_rm_subs",        INT_PARAM, &timeout_rm_subs},
-	{ "send_fast_notify",       INT_PARAM, &send_fast_notify},
-	{ "fetch_rows",             INT_PARAM, &pres_fetch_rows},
-	{ "db_table_lock_type",     INT_PARAM, &db_table_lock_type},
-	{ "local_log_level",        PARAM_INT, &pres_local_log_level},
-	{ "subs_remove_match",      PARAM_INT, &pres_subs_remove_match},
-	{ "xavp_cfg",               PARAM_STR, &pres_xavp_cfg},
-	{ "retrieve_order",         PARAM_INT, &pres_retrieve_order},
-	{ "sip_uri_match",          PARAM_INT, &pres_uri_match},
+	{ "db_url",                   PARAM_STR, &db_url},
+	{ "presentity_table",         PARAM_STR, &presentity_table},
+	{ "active_watchers_table",    PARAM_STR, &active_watchers_table},
+	{ "watchers_table",           PARAM_STR, &watchers_table},
+	{ "clean_period",             INT_PARAM, &clean_period },
+	{ "db_update_period",         INT_PARAM, &db_update_period },
+	{ "waitn_time",               INT_PARAM, &pres_waitn_time },
+	{ "notifier_poll_rate",       INT_PARAM, &pres_notifier_poll_rate },
+	{ "notifier_processes",       INT_PARAM, &pres_notifier_processes },
+	{ "to_tag_pref",              PARAM_STRING, &to_tag_pref },
+	{ "expires_offset",           INT_PARAM, &expires_offset },
+	{ "max_expires",              INT_PARAM, &max_expires },
+	{ "min_expires",              INT_PARAM, &min_expires },
+	{ "min_expires_action",       INT_PARAM, &min_expires_action },
+	{ "server_address",           PARAM_STR, &server_address},
+	{ "subs_htable_size",         INT_PARAM, &shtable_size},
+	{ "pres_htable_size",         INT_PARAM, &phtable_size},
+	{ "subs_db_mode",             INT_PARAM, &subs_dbmode},
+	{ "subs_use_highest_version"  INT_PARAM, &subs_use_highest_version},
+	{ "publ_cache",               INT_PARAM, &publ_cache_enabled},
+	{ "enable_sphere_check",      INT_PARAM, &sphere_enable},
+	{ "timeout_rm_subs",          INT_PARAM, &timeout_rm_subs},
+	{ "send_fast_notify",         INT_PARAM, &send_fast_notify},
+	{ "fetch_rows",               INT_PARAM, &pres_fetch_rows},
+	{ "db_table_lock_type",       INT_PARAM, &db_table_lock_type},
+	{ "local_log_level",          PARAM_INT, &pres_local_log_level},
+	{ "subs_remove_match",        PARAM_INT, &pres_subs_remove_match},
+	{ "xavp_cfg",                 PARAM_STR, &pres_xavp_cfg},
+	{ "retrieve_order",           PARAM_INT, &pres_retrieve_order},
+	{ "sip_uri_match",            PARAM_INT, &pres_uri_match},
     {0,0,0}
 };
 

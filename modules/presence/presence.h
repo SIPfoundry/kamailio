@@ -76,6 +76,7 @@ extern int min_expires;
 extern int min_expires_action;
 extern int max_expires;
 extern int subs_dbmode;
+extern int subs_use_highest_version;
 extern int publ_cache_enabled;
 extern int sphere_enable;
 extern int timeout_rm_subs;
