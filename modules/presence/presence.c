@@ -209,7 +209,7 @@ static param_export_t params[]={
 	{ "subs_htable_size",         INT_PARAM, &shtable_size},
 	{ "pres_htable_size",         INT_PARAM, &phtable_size},
 	{ "subs_db_mode",             INT_PARAM, &subs_dbmode},
-	{ "subs_use_highest_version"  INT_PARAM, &subs_use_highest_version},
+	{ "subs_use_highest_version", INT_PARAM, &subs_use_highest_version},
 	{ "publ_cache",               INT_PARAM, &publ_cache_enabled},
 	{ "enable_sphere_check",      INT_PARAM, &sphere_enable},
 	{ "timeout_rm_subs",          INT_PARAM, &timeout_rm_subs},

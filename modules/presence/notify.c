@@ -1151,10 +1151,13 @@ int get_subs_db(str* pres_uri, pres_ev_t* event, str* sender,
 
 
 		s.version = row_vals[version_col].val.int_val +1;
-		if(s.version < highest_version)
-			s.version = highest_version; 
-		else 
-			highest_version = s.version;
+		if(subs_use_highest_version) 
+		{
+			if(s.version < highest_version)
+				s.version = highest_version; 
+			else 
+				highest_version = s.version;
+		}
 
 		s_new= mem_copy_subs(&s, PKG_MEM_TYPE);
 		if(s_new== NULL)
@@ -1233,11 +1236,14 @@ subs_t* get_subs_dialog(str* pres_uri, pres_ev_t* event, str* sender)
 				goto error;
 			}
 			s_new->expires-= (int)time(NULL);
-			if(s_new->version < highest_version)
-				s_new->version = highest_version; 
-			else 
-				highest_version = s_new->version;
-		
+			if(subs_use_highest_version) 
+			{
+				if(s_new->version < highest_version)
+					s_new->version = highest_version; 
+				else 
+					highest_version = s_new->version;
+			}
+
 			s_new->next= s_array;
 			s_array= s_new;
 		}
