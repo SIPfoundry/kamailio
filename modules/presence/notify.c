@@ -995,7 +995,6 @@ int get_subs_db(str* pres_uri, pres_ev_t* event, str* sender,
 	int version_col= 0, record_route_col = 0, contact_col = 0;
 	int sockinfo_col= 0, local_contact_col= 0, event_id_col = 0;
 	int watcher_user_col= 0, watcher_domain_col= 0;
-	int highest_version=0;
 	subs_t s, *s_new;
 	int inc= 0;
 		
@@ -1149,16 +1148,8 @@ int get_subs_db(str* pres_uri, pres_ev_t* event, str* sender,
 		else
 		    s.expires = row_vals[expires_col].val.int_val - (int)time(NULL);
 
-
 		s.version = row_vals[version_col].val.int_val +1;
-		if(subs_use_highest_version) 
-		{
-			if(s.version < highest_version)
-				s.version = highest_version; 
-			else 
-				highest_version = s.version;
-		}
-
+		
 		s_new= mem_copy_subs(&s, PKG_MEM_TYPE);
 		if(s_new== NULL)
 		{
@@ -1188,7 +1179,7 @@ subs_t* get_subs_dialog(str* pres_uri, pres_ev_t* event, str* sender)
 	unsigned int hash_code;
 	subs_t* s= NULL, *s_new;
 	subs_t* s_array= NULL;
-	int n= 0, highest_version = 0;
+	int n= 0;
 	
 	/* if subs_dbmode!=DB_ONLY, should take the subscriptions from the hashtable only
 	   in DB_ONLY mode should take all dialogs from db
@@ -1236,14 +1227,7 @@ subs_t* get_subs_dialog(str* pres_uri, pres_ev_t* event, str* sender)
 				goto error;
 			}
 			s_new->expires-= (int)time(NULL);
-			if(subs_use_highest_version) 
-			{
-				if(s_new->version < highest_version)
-					s_new->version = highest_version; 
-				else 
-					highest_version = s_new->version;
-			}
-
+			
 			s_new->next= s_array;
 			s_array= s_new;
 		}

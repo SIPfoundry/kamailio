@@ -478,6 +478,85 @@ void delete_subs(str* pres_uri, str* ev_name, str* to_tag,
 		LM_ERR("Failed to delete subscription from database\n");
 }
 
+int get_subs_highest_version(subs_t* s, int *highest_version)
+{
+	db_key_t query_cols[7];
+	db_op_t  query_ops[7];
+	db_val_t query_vals[7];
+	db_key_t result_cols[19];
+	int n_result_cols = 0, n_query_cols = 0;
+	db_row_t *row ;	
+	db_val_t *row_vals ;
+	db1_res_t *result = NULL;
+	int version_col= 0;
+		
+	if (pa_dbf.use_table(pa_db, &active_watchers_table) < 0) 
+	{
+		LM_ERR("in use_table\n");
+		return -1;
+	}
+
+	LM_DBG("querying database table = active_watchers\n");
+	query_cols[n_query_cols] = &str_presentity_uri_col;
+	query_ops[n_query_cols] = OP_EQ;
+	query_vals[n_query_cols].type = DB1_STR;
+	query_vals[n_query_cols].nul = 0;
+	query_vals[n_query_cols].val.str_val = s->pres_uri;
+	n_query_cols++;
+	
+	query_cols[n_query_cols] = &str_event_col;
+	query_ops[n_query_cols] = OP_EQ;
+	query_vals[n_query_cols].type = DB1_STR;
+	query_vals[n_query_cols].nul = 0;
+	query_vals[n_query_cols].val.str_val = s->event->name;
+	n_query_cols++;
+
+	query_cols[n_query_cols] = &str_status_col;
+	query_ops[n_query_cols] = OP_EQ;
+	query_vals[n_query_cols].type = DB1_INT;
+	query_vals[n_query_cols].nul = 0;
+	query_vals[n_query_cols].val.int_val = ACTIVE_STATUS;
+	n_query_cols++;
+
+	query_cols[n_query_cols] = &str_contact_col;
+	query_ops[n_query_cols] = OP_NEQ;
+	query_vals[n_query_cols].type = DB1_STR;
+	query_vals[n_query_cols].nul = 0;
+	query_vals[n_query_cols].val.str_val.s = "";
+	query_vals[n_query_cols].val.str_val.len = 0;
+	n_query_cols++;
+
+	result_cols[version_col=n_result_cols++] = &str_version_col;
+
+	if (pa_dbf.query(pa_db, query_cols, query_ops, query_vals,result_cols,
+				n_query_cols, n_result_cols, &str_version_col, &result) < 0) 
+	{
+		LM_ERR("while querying database\n");
+		if(result)
+		{
+			pa_dbf.free_result(pa_db, result);
+		}
+		return -1;
+	}
+
+	if(result== NULL)
+		return -1;
+
+	if(result->n <=0 )
+	{
+		pa_dbf.free_result(pa_db, result);
+		return 0;
+	} else
+	{
+		// get the last row for highest version
+		row = &result->rows[result->n - 1];
+		row_vals = ROW_VALUES(row);
+		*highest_version = row_vals[version_col].val.int_val;
+		pa_dbf.free_result(pa_db, result);
+		return 1;	
+	}
+}
+
 int update_subscription_notifier(struct sip_msg* msg, subs_t* subs,
 		int to_tag_gen, int* sent_reply)
 {
@@ -550,6 +629,8 @@ int update_subscription(struct sip_msg* msg, subs_t* subs, int to_tag_gen,
 		int* sent_reply)
 {
 	unsigned int hash_code;
+	int subs_highest_version = 0;
+	subs_t* s = NULL;
 
 	LM_DBG("update subscription\n");
 	printf_subs(subs);
@@ -634,7 +715,21 @@ int update_subscription(struct sip_msg* msg, subs_t* subs, int to_tag_gen,
 				LM_DBG("inserting in shtable\n");
 				subs->db_flag = (subs_dbmode==WRITE_THROUGH)?WTHROUGHDB_FLAG:INSERTDB_FLAG;
 				hash_code= core_case_hash(&subs->pres_uri, &subs->event->name, shtable_size);
-				subs->version = 0;
+				
+				if(subs_use_highest_version)
+				{
+					lock_get(&subs_htable[hash_code].lock);
+					s = subs_htable[hash_code].entries;
+					while(s->next)
+					{
+						s = s->next;
+						if(s->version > subs_highest_version)
+							subs_highest_version = s->version;
+					}
+					lock_release(&subs_htable[hash_code].lock);
+				}
+
+				subs->version = subs_highest_version;
 				if(insert_shtable(subs_htable,hash_code,subs)< 0)
 				{
 					LM_ERR("failed to insert new record in subs htable\n");
@@ -645,6 +740,14 @@ int update_subscription(struct sip_msg* msg, subs_t* subs, int to_tag_gen,
 			if(subs_dbmode == DB_ONLY || subs_dbmode == WRITE_THROUGH)
 			{
 				subs->version = 1;
+				if(subs_use_highest_version)
+				{
+					if(get_subs_highest_version(subs, &subs_highest_version))
+					{
+						subs->version = subs_highest_version > 1 ? subs_highest_version : 1;
+					}
+				}
+				
 				if(insert_subs_db(subs, REMOTE_TYPE) < 0)
 				{
 					LM_ERR("failed to insert new record in database\n");
