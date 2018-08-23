@@ -327,6 +327,9 @@ void subs_cback_func(struct cell *t, int type, struct tmcb_params *ps)
 	struct sip_msg* msg= NULL;
 	subs_info_t* hentity= NULL;
 	struct sip_uri uri;
+	str* tmp_body= NULL;
+	str* n_body= NULL;
+	publ_info_t publ;	
 
 	LM_INFO("Hybrid dialog subscribe completed with status %d\n", ps->code) ;
 
@@ -366,10 +369,32 @@ void subs_cback_func(struct cell *t, int type, struct tmcb_params *ps)
 			goto end;
 		}
 
-		if( collate_plugin.collate_handle_queue_dialog(collate_handle, &uri.user, &uri.host, NULL) < 0 ) {
-      		LM_ERR("cannot queue dialog body to collator\n");
-      		goto end;
-    	}
+		if(enable_dialog_collate) {
+			if( collate_plugin.collate_handle_queue_dialog(collate_handle, &uri.user, &uri.host, NULL) < 0 ) {
+	      		LM_ERR("cannot queue dialog body to collator\n");
+	      		goto end;
+	    	}
+	    } else {
+	    	memset(&publ, 0 , sizeof(publ_info_t));
+			tmp_body = (str*)pkg_malloc(sizeof(str));
+			if(tmp_body == NULL) {
+				LM_ERR("No more private memory\n");
+				goto end;
+			}
+
+			n_body = collate_plugin.collate_notify_xml(collate_handle, tmp_body, &uri.user, &uri.host, NULL);
+			if(n_body != NULL) {
+				LM_DBG("Collate Notify is %.*s\n", n_body->len, n_body->s);
+
+				publ.pres_uri = hentity->pres_uri;
+				publ.body = n_body;
+
+				if (send_publish(&publ) < 0) {
+				  LM_ERR("Send publish failed\n");
+				  goto end;
+				}
+			}
+	    }
 	}
 
 end:
@@ -378,6 +403,12 @@ end:
 		shm_free(hentity);
 		hentity= NULL;
 	}
+
+	if(n_body) {
+	    collate_plugin.free_collate_body(collate_handle, n_body->s);  
+	    pkg_free(n_body);    
+  	}
+
 	return;
 }
 
