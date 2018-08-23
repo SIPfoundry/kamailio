@@ -28,6 +28,32 @@
 #ifndef _PRES_DLGINFO_H_
 #define _PRES_DLGINFO_H_
 
+#include "../../modules/tm/tm_load.h"
+#include "../presence/presence.h"
+#include "dialog_collator.h"
+
+/* DB module bind */
+extern db_func_t pa_dbf;
+extern db1_con_t* pa_db;
+
+extern struct tm_binds tmb;
+
+/* Hybrid sipx dialog */
+extern int enable_dialog_check;
+extern int enable_dialog_collate;
+extern int dialog_check_period;
+extern int dialog_collate_period;
+extern str outbound_proxy;
+extern str server_address;
+extern str default_subscribe_username;
+
+/* Support for polycom aggregation */
+extern int force_single_dialog;
+extern int force_dummy_dialog;
+extern int use_dialog_event_collator;
+extern void* collate_handle;
+extern collate_plugin_t collate_plugin;
+
 extern add_event_t pres_add_event;
 
 #endif

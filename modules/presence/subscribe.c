@@ -561,6 +561,7 @@ int update_subscription_notifier(struct sip_msg* msg, subs_t* subs,
 		int to_tag_gen, int* sent_reply)
 {
 	int num_peers = 0;
+	int subs_highest_version = 0;
 
 	*sent_reply= 0;
 
@@ -603,6 +604,16 @@ int update_subscription_notifier(struct sip_msg* msg, subs_t* subs,
 	else
 	{
 		subs->version = 1;
+		if(subs_use_highest_version)
+		{
+			if(get_subs_highest_version(subs, &subs_highest_version))
+			{
+				if(subs_highest_version > 1) {
+					LM_INFO("Update pres_uri: %.*s highest version: %d > %d\n", subs->pres_uri.len, subs->pres_uri.s, subs->version, subs_highest_version);
+				}
+				subs->version = subs_highest_version > 1 ? subs_highest_version : 1;
+			}
+		}
 		if (insert_subs_db(subs, REMOTE_TYPE) < 0)
 		{
 			LM_ERR("failed to insert new record in database\n");
@@ -629,7 +640,7 @@ int update_subscription(struct sip_msg* msg, subs_t* subs, int to_tag_gen,
 		int* sent_reply)
 {
 	unsigned int hash_code;
-	int subs_highest_version = 0;
+	int subs_highest_version = 1;
 	subs_t* s = NULL;
 
 	LM_DBG("update subscription\n");
@@ -727,6 +738,10 @@ int update_subscription(struct sip_msg* msg, subs_t* subs, int to_tag_gen,
 							subs_highest_version = s->version;
 					}
 					lock_release(&subs_htable[hash_code].lock);
+
+					if(subs_highest_version > 1) {
+						LM_INFO("New pres_uri: %.*s highest version: %d > %d\n", subs->pres_uri.len, subs->pres_uri.s, subs->version, subs_highest_version);
+					}
 				}
 
 				subs->version = subs_highest_version;
@@ -744,6 +759,9 @@ int update_subscription(struct sip_msg* msg, subs_t* subs, int to_tag_gen,
 				{
 					if(get_subs_highest_version(subs, &subs_highest_version))
 					{
+						if(subs_highest_version > 1) {
+							LM_INFO("New[db] pres_uri: %.*s highest version: %d > %d\n", subs->pres_uri.len, subs->pres_uri.s, subs->version, subs_highest_version);
+						}
 						subs->version = subs_highest_version > 1 ? subs_highest_version : 1;
 					}
 				}
@@ -2136,10 +2154,12 @@ void update_db_subs_timer(db1_con_t *db,db_func_t dbf, shtable_t hash_table,
 	int u_expires_col, u_local_cseq_col, u_remote_cseq_col, u_version_col,
 		u_reason_col, u_status_col;
 	int i;
-	subs_t* s= NULL, *prev_s= NULL;
+	subs_t* s= NULL, *prev_s= NULL, *ver_s;
 	int n_query_cols= 0, n_update_cols= 0;
 	int n_query_update;
+	int n_subs_highest_version = 0;
 	int now = (int)time(NULL);
+	unsigned int hash_code;
 
 	LM_DBG("update_db_subs_timer: start\n");
 
@@ -2325,6 +2345,26 @@ void update_db_subs_timer(db1_con_t *db,db_func_t dbf, shtable_t hash_table,
 				shm_free(del_s);
 				continue;
 			}
+
+			if(subs_use_highest_version)
+			{
+				n_subs_highest_version = s->version;
+				hash_code= core_case_hash(&s->pres_uri, &s->event->name, shtable_size);
+				ver_s = subs_htable[hash_code].entries;
+				while(ver_s->next)
+				{
+					ver_s = ver_s->next;
+					if(ver_s->version > n_subs_highest_version)
+						n_subs_highest_version = ver_s->version;
+				}
+
+				// Update version
+				if(n_subs_highest_version > s->version) {
+					LM_INFO("Sync pres_uri: %.*s highest version: %d > %d\n", s->pres_uri.len, s->pres_uri.s, s->version, n_subs_highest_version);
+					s->version = n_subs_highest_version;
+				}
+			}
+
 			switch(s->db_flag)
 			{
 				case NO_UPDATEDB_FLAG:
@@ -2453,6 +2493,7 @@ int restore_db_subs(void)
 	db_val_t *row_vals= NULL;
 	int i;
 	int n_result_cols= 0;
+	int n_subs_highest_version = 0;
 	int pres_uri_col, expires_col, from_user_col, from_domain_col,to_user_col; 
 	int callid_col,totag_col,fromtag_col,to_domain_col,sockinfo_col,reason_col;
 	int event_col,contact_col,record_route_col, event_id_col, status_col;
@@ -2633,6 +2674,21 @@ int restore_db_subs(void)
 			s.sockinfo_str.len= strlen(s.sockinfo_str.s);
 			s.db_flag = (subs_dbmode==WRITE_THROUGH)?WTHROUGHDB_FLAG:NO_UPDATEDB_FLAG;
 			hash_code= core_case_hash(&s.pres_uri, &s.event->name, shtable_size);
+
+			if(subs_use_highest_version)
+			{
+				n_subs_highest_version = s.version;
+				if(get_subs_highest_version(&s, &n_subs_highest_version))
+				{
+					if(n_subs_highest_version > s.version) {
+						s.version = n_subs_highest_version;
+						LM_NOTICE("[SUBVERSION::RESTORE] Update pres_uri: %.*s highest version: %d > %d\n", s.pres_uri.len, s.pres_uri.s, s.version, n_subs_highest_version);
+					} else {
+						LM_NOTICE("[SUBVERSION::RESTORE] pres_uri: %.*s start version at %d\n", s.pres_uri.len, s.pres_uri.s, s.version);
+					}
+				}
+			}
+
 			if(insert_shtable(subs_htable, hash_code, &s)< 0)
 			{
 				LM_ERR("adding new record in hash table\n");

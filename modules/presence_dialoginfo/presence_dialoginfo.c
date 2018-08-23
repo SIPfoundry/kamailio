@@ -33,15 +33,18 @@
 #include <unistd.h>
 #include <dlfcn.h>
 
+#include "../../lib/srdb1/db.h"
 #include "../../sr_module.h"
 #include "../../dprint.h"
 #include "../../str.h"
 #include "../../parser/msg_parser.h"
 #include "../../mem/mem.h"
 #include "../../mem/shm_mem.h"
+#include "../../timer_proc.h"
 #include "../presence/bind_presence.h"
 #include "add_events.h"
-#include "dialog_collator.h"
+#include "send_subscribe.h"
+#include "notify.h"
 #include "presence_dialoginfo.h"
 
 MODULE_VERSION
@@ -54,17 +57,33 @@ static void mod_destroy(void);
 static int child_init(int rank);
 
 /* module variables */
+struct tm_binds tmb;
 add_event_t pres_add_event;
+collate_plugin_t collate_plugin;
+void* collate_handle = NULL;
+void* handle_collate_plugin = NULL;
+
+/* database connection */
+db1_con_t *pa_db = NULL;
+db_func_t pa_dbf;
+str active_watchers_table = str_init("active_watchers");
+str db_url = {0, 0};
 
 /* module parameters */
 int force_single_dialog = 0;
 int force_dummy_dialog = 0;
+int enable_dialog_check = 0;
+int enable_dialog_collate = 0;
+int dialog_check_period = 30;
+int dialog_collate_period = 15;
 
-/* custom module parameters */
 int use_dialog_event_collator = 0;
 int dialog_collator_log_level = 2;
-str dialog_collator_log_file = str_init("");
+str dialog_collator_log_file = {0, 0};
 str dialog_collator_plugin_name = str_init("libdialogEventCollator.so");
+str default_subscribe_username = str_init("presence");
+str outbound_proxy = {0, 0};
+str server_address = {0, 0};
 
 /*collate_plugin_t
 ** Detect whether or not we are building for a 32- or 64-bit (LP/LLP)
@@ -78,25 +97,32 @@ str dialog_collator_plugin_path = str_init("/usr/lib64/kamailio/integration");
 str dialog_collator_plugin_path = str_init("/usr/lib/kamailio/integration");
 #endif
 
-void* handle_collate_plugin = NULL;
-void* collate_handle = NULL;
-collate_plugin_t collate_plugin;
 
 /* module exported commands */
 static cmd_export_t cmds[] =
 {
+    {"dialog_handle_notify", (cmd_function)dialog_handle_notify, 0, 0, 0, REQUEST_ROUTE},
     {0,	0, 0, 0, 0, 0}
 };
 
 /* module exported paramaters */
 static param_export_t params[] = {
+    { "db_url", PARAM_STR, &db_url},
 	{ "force_single_dialog", INT_PARAM, &force_single_dialog },
 	{ "force_dummy_dialog", INT_PARAM, &force_dummy_dialog },
+    { "enable_active_dialog_check", INT_PARAM, &enable_dialog_check },
+    { "enable_active_dialog_collate", INT_PARAM, &enable_dialog_collate },
+    { "dialog_active_check_period", INT_PARAM, &dialog_check_period },
+    { "dialog_active_collate_period", INT_PARAM, &dialog_collate_period },
+    { "outbound_proxy", PARAM_STR, &outbound_proxy },
+    { "server_address", PARAM_STR, &server_address },
+    { "default_subscribe_username", PARAM_STR, &default_subscribe_username },
     { "use_dialog_event_collator", INT_PARAM, &use_dialog_event_collator },
     { "dialog_collator_plugin_name", PARAM_STR, &dialog_collator_plugin_name },
     { "dialog_collator_plugin_path", PARAM_STR, &dialog_collator_plugin_path },
     { "dialog_collator_log_file", PARAM_STR, &dialog_collator_log_file },
     { "dialog_collator_log_level", INT_PARAM, &dialog_collator_log_level },
+    { "active_watchers_table", PARAM_STR, &active_watchers_table},
 	{0, 0, 0}
 };
 
@@ -149,13 +175,42 @@ static int mod_init(void)
 		LM_ERR("could not import add_event\n");
 		return -1;
 	}
+
 	if(dlginfo_add_events() < 0) {
 		LM_ERR("failed to add dialog-info events\n");
 		return -1;		
 	}
+
+    /* load TM API */
+    if(load_tm_api(&tmb)==-1)
+    {
+        LM_ERR("can't load tm functions\n");
+        return -1;
+    }
         
     if(use_dialog_event_collator != 0) 
     {
+        /* binding to database module  */
+        if (db_bind_mod(&db_url, &pa_dbf))
+        {
+            LM_ERR("Database module not found\n");
+            return -1;
+        }
+
+        if (!DB_CAPABILITY(pa_dbf, DB_CAP_ALL))
+        {
+            LM_ERR("Database module does not implement all functions"
+                    " needed by presence module\n");
+            return -1;
+        }
+
+        pa_db = pa_dbf.init(&db_url);
+        if (!pa_db)
+        {
+            LM_ERR("Connection to database failed\n");
+            return -1;
+        }
+
         if((!dialog_collator_plugin_name.s || !dialog_collator_plugin_name.len)
                 || (!dialog_collator_plugin_path.s || !dialog_collator_plugin_path.len)) 
         {
@@ -200,6 +255,11 @@ static int mod_init(void)
             return -1;
         }
 
+        if(dialog_check_period < dialog_collate_period) {
+            LM_ERR("dialog_check_period must be greater than dialog_collate_period\n");
+            return -1;
+        }
+
         if(collate_plugin.collate_plugin_init)
         {
             memset(collate_keys, 0, sizeof(collate_keys));
@@ -230,6 +290,16 @@ static int mod_init(void)
             }
         }
         
+        if(enable_dialog_check) {
+            if(init_dialog_timers() < 0) 
+            {
+                LM_ERR("can't start dialog timers\n");
+                return -1;
+            }    
+        }
+        
+        pa_dbf.close(pa_db);
+        pa_db = NULL;
     }
     
     return 0;
@@ -240,15 +310,37 @@ static int child_init(int rank)
     if (rank==PROC_INIT || rank==PROC_MAIN || rank==PROC_TCP_MAIN)
         return 0; /* do nothing for the main process */
 
+    if (pa_dbf.init==0)
+    {
+        LM_CRIT("child_init: database not bound\n");
+        return -1;
+    }
+
+    pa_db = pa_dbf.init(&db_url);
+    if (!pa_db)
+    {
+        LM_ERR("child %d: unsuccessful connecting to database\n", rank);
+        return -1;
+    }
+    
+    if (pa_dbf.use_table(pa_db, &active_watchers_table) < 0)  
+    {
+        LM_ERR( "child %d:unsuccessful use_table active_watchers_table\n",
+                rank);
+        return -1;
+    }
+
     return 0;
 }
 
 static void mod_destroy(void)
 {
+    clean_dialog_timers();
+
     //Cleanup collate plugin
     if(handle_collate_plugin != NULL)  
     {
-        if(collate_plugin.collate_handle_destroy)
+        if(collate_plugin.collate_handle_destroy && collate_handle)
         {
             collate_plugin.collate_handle_destroy(collate_handle);
         }
@@ -259,5 +351,10 @@ static void mod_destroy(void)
         }
         
         dlclose(handle_collate_plugin);
+    }
+
+    if(pa_db && pa_dbf.close)
+    {
+        pa_dbf.close(pa_db);
     }
 }

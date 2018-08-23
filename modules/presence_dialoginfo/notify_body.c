@@ -49,6 +49,7 @@
 #include "../presence/event_list.h"
 #include "../presence/presence.h"
 #include "../presence/presentity.h"
+#include "presence_dialoginfo.h"
 #include "dialog_collator.h"
 #include "notify_body.h"
 #include "pidf.h"
@@ -56,12 +57,6 @@
 str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n);
 int check_relevant_state (xmlChar * dialog_id, xmlDocPtr * xml_array, int total_nodes);
 str* collate_or_agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n);
-
-extern int force_single_dialog;
-extern int force_dummy_dialog;
-extern int use_dialog_event_collator;
-extern void* collate_handle;
-extern collate_plugin_t collate_plugin;
 
 
 void free_xml_body(char* body)
