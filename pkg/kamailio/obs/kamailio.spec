@@ -26,6 +26,7 @@
 %bcond_without sctp
 %bcond_without websocket
 %bcond_without xmlrpc
+%bcond_without sipx
 %endif
 
 %if 0%{?centos_ver} == 6
@@ -52,6 +53,7 @@
 %bcond_without sctp
 %bcond_without websocket
 %bcond_without xmlrpc
+%bcond_with sipx
 %endif
 
 %if 0%{?centos_ver} == 7
@@ -62,23 +64,24 @@
 %bcond_with dnssec
 %bcond_without evapi
 %bcond_without geoip
-%bcond_without http_async_client
+%bcond_with http_async_client
 %bcond_without ims
 %bcond_without jansson
 %bcond_without json
 %bcond_without lua
 %bcond_without kazoo
 %bcond_without memcached
-%bcond_without mongodb
+%bcond_with mongodb
 %bcond_without perl
-%bcond_without phonenum
-%bcond_without python3
+%bcond_with phonenum
+%bcond_with python3
 %bcond_without rabbitmq
-%bcond_without redis
+%bcond_with redis
 %bcond_without ruby
-%bcond_without sctp
+%bcond_with sctp
 %bcond_without websocket
 %bcond_without xmlrpc
+%bcond_with sipx
 %endif
 
 %if 0%{?centos_ver} == 8
@@ -106,6 +109,7 @@
 %bcond_without sctp
 %bcond_without websocket
 %bcond_without xmlrpc
+%bcond_without sipx
 %endif
 
 %if 0%{?suse_version}
@@ -132,6 +136,7 @@
 %bcond_without sctp
 %bcond_without websocket
 %bcond_without xmlrpc
+%bcond_without sipx
 %endif
 
 %if 0%{?rhel} == 6 && 0%{?centos_ver} != 6
@@ -158,6 +163,7 @@
 %bcond_with sctp
 %bcond_with websocket
 %bcond_without xmlrpc
+%bcond_without sipx
 %endif
 
 %if 0%{?rhel} == 7 && 0%{?centos_ver} != 7
@@ -184,6 +190,7 @@
 %bcond_without sctp
 %bcond_without websocket
 %bcond_without xmlrpc
+%bcond_without sipx
 %endif
 
 %if 0%{?rhel} == 8 && 0%{?centos_ver} != 8
@@ -210,6 +217,7 @@
 %bcond_without sctp
 %bcond_without websocket
 %bcond_without xmlrpc
+%bcond_without sipx
 %endif
 
 # Defining missing macros on RHEL/CentOS 6
@@ -668,7 +676,6 @@ Memcached configuration file support for Kamailio.
 %endif
 
 
-%if %{with mongodb}
 %package    mongodb
 Summary:    MongoDB database connectivity for Kamailio
 Group:      %{PKGGROUP}
@@ -678,7 +685,6 @@ BuildRequires:  mongo-c-driver-devel
 
 %description    mongodb
 MongoDB database connectivity for Kamailio.
-%endif
 
 
 %package    mysql
@@ -873,6 +879,16 @@ BuildRequires:  lksctp-tools-devel
 %description    sctp
 SCTP transport for Kamailio.
 %endif
+
+
+%package  sipx
+Summary:  SIPX plugins for Kamailio
+Group:    Productivity/Telephony/SIP/Servers
+Requires: libxml2, libcurl, kamailio = %ver, kamailio-mongodb = %ver, kamailio-presence = %ver
+BuildRequires: libxml2-devel, curl-devel
+
+%description    sipx 
+SIPX plugins for Kamailio.
 
 
 %package    secfilter
@@ -1176,9 +1192,7 @@ make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
 %if %{with xmlrpc}
     kmi_xmlrpc \
 %endif
-%if %{with mongodb}
     kmongodb \
-%endif
     kmysql koutbound \
 %if %{with perl}
     kperl \
@@ -1200,6 +1214,7 @@ make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
 %if %{with sctp}
     ksctp \
 %endif
+    ksipx \
     ksnmpstats ksqlite ktls kunixodbc kutils \
 %if %{with websocket}
     kwebsocket \
@@ -1264,9 +1279,7 @@ make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
 %if %{with xmlrpc}
     kmi_xmlrpc \
 %endif
-%if %{with mongodb}
     kmongodb \
-%endif
     kmysql koutbound \
 %if %{with perl}
     kperl \
@@ -1288,6 +1301,7 @@ make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
 %if %{with sctp}
     ksctp \
 %endif
+    ksipx \
     ksnmpstats ksqlite ktls kunixodbc kutils \
 %if %{with websocket}
     kwebsocket \
@@ -1907,14 +1921,12 @@ fi
 %endif
 
 
-%if %{with mongodb}
 %files      mongodb
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.db_mongodb
 %doc %{_docdir}/kamailio/modules/README.ndb_mongodb
 %{_libdir}/kamailio/modules/db_mongodb.so
 %{_libdir}/kamailio/modules/ndb_mongodb.so
-%endif
 
 
 %files      mysql
@@ -2113,6 +2125,11 @@ fi
 %doc %{_docdir}/kamailio/modules/README.sctp
 %{_libdir}/kamailio/modules/sctp.so
 %endif
+
+%files          sipx
+%defattr(-,root,root)
+%doc %{_docdir}/kamailio/modules/README.sipx_bla
+%{_libdir}/kamailio/modules/sipx_bla.so
 
 
 %files      secfilter

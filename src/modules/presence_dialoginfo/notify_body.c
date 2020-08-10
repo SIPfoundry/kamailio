@@ -45,12 +45,14 @@
 #include "../presence/event_list.h"
 #include "../presence/presence.h"
 #include "../presence/presentity.h"
+#include "presence_dialoginfo.h"
 #include "notify_body.h"
 #include "pidf.h"
 
 str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n);
 int check_relevant_state (xmlChar * dialog_id, xmlDocPtr * xml_array,
 		int total_nodes);
+str* collate_or_agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n);
 
 extern int force_single_dialog;
 extern int force_dummy_dialog;
@@ -60,7 +62,11 @@ void free_xml_body(char* body)
 	if(body== NULL)
 		return;
 
-	xmlFree(body);
+    if(force_single_dialog && use_dialog_event_collator) {
+        collate_plugin.free_collate_body(collate_handle, body);
+    } else {
+        xmlFree(body);
+    }
 	body= NULL;
 }
 
@@ -99,7 +105,7 @@ str* dlginfo_agg_nbody_empty(str* pres_user, str* pres_domain)
 	body_array->len = strlen(body);
 
 
-	n_body= agregate_xmls(pres_user, pres_domain, &body_array, 1);
+	n_body= collate_or_agregate_xmls(pres_user, pres_domain, &body_array, 1);
 	LM_DBG("[n_body]=%p\n", n_body);
 	if(n_body!=NULL) {
 		LM_DBG("[*n_body]=%.*s\n",n_body->len, n_body->s);
@@ -131,7 +137,7 @@ str* dlginfo_agg_nbody(str* pres_user, str* pres_domain, str** body_array,
 	if(body_array== NULL)
 		return dlginfo_agg_nbody_empty(pres_user, pres_domain);
 
-	n_body= agregate_xmls(pres_user, pres_domain, body_array, n);
+	n_body= collate_or_agregate_xmls(pres_user, pres_domain, body_array, n);
 	LM_DBG("[n_body]=%p\n", n_body);
 	if(n_body) {
 		LM_DBG("[*n_body]=%.*s\n",
@@ -446,6 +452,31 @@ error:
 	return NULL;
 }
 
+str* collate_or_agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n)
+{
+    str* tmp_body= NULL;
+    str* n_body= NULL;
+    
+    if(force_single_dialog && use_dialog_event_collator) 
+    {
+        tmp_body = (str*)pkg_malloc(sizeof(str));
+        if(tmp_body == NULL) {
+            ERR_MEM(PKG_MEM_STR);
+        }
+
+        n_body = collate_plugin.collate_body_xml(collate_handle, tmp_body, pres_user, pres_domain, body_array, n);
+        if(n_body == NULL) {
+            pkg_free(tmp_body);
+        }
+    } else 
+    {
+        n_body= agregate_xmls(pres_user, pres_domain, body_array, n);
+    }
+    
+error:
+    return n_body;
+}
+
 
 /* returns 16 -> terminated, 8 -> confirmed, 4 -> early */
 int check_relevant_state (xmlChar * dialog_id, xmlDocPtr * xml_array,
@@ -499,7 +530,7 @@ int check_relevant_state (xmlChar * dialog_id, xmlDocPtr * xml_array,
 									== 0)) {
 							LM_DBG("Found terminated in dialog %s\n",
 									dialog_id);
-							result += DEF_TERMINATED_NODE;
+							result |= DEF_TERMINATED_NODE;
 						}
 						/* check if state is confirmed for this dialog. */
 						if((strcasecmp(state, "confirmed") == 0)
@@ -508,7 +539,7 @@ int check_relevant_state (xmlChar * dialog_id, xmlDocPtr * xml_array,
 										(char *)dialog_id)
 									== 0)) {
 							LM_DBG("Found confirmed in dialog %s\n", dialog_id);
-							result += DEF_CONFIRMED_NODE;
+							result |= DEF_CONFIRMED_NODE;
 						}
 						if((strcasecmp(state, "early") == 0) && (node_id == i)
 								&& (node_id >= 0)
@@ -516,7 +547,7 @@ int check_relevant_state (xmlChar * dialog_id, xmlDocPtr * xml_array,
 										(char *)dialog_id)
 									== 0)) {
 							LM_DBG("Found early in dialog %s\n", dialog_id);
-							result += DEF_EARLY_NODE;
+							result |= DEF_EARLY_NODE;
 						}
 						if((strcasecmp(state, "proceeding") == 0)
 								&& (node_id == i) && (node_id >= 0)
@@ -525,7 +556,7 @@ int check_relevant_state (xmlChar * dialog_id, xmlDocPtr * xml_array,
 									== 0)) {
 							LM_DBG("Found proceeding in dialog %s\n",
 									dialog_id);
-							result += DEF_PROCEEDING_NODE;
+							result |= DEF_PROCEEDING_NODE;
 						}
 						if((strcasecmp(state, "trying") == 0) && (node_id == i)
 								&& (node_id >= 0)
@@ -533,7 +564,7 @@ int check_relevant_state (xmlChar * dialog_id, xmlDocPtr * xml_array,
 										(char *)dialog_id)
 									== 0)) {
 							LM_DBG("Found trying in dialog %s\n", dialog_id);
-							result += DEF_TRYING_NODE;
+							result |= DEF_TRYING_NODE;
 						}
 						xmlFree(state);
 					}
